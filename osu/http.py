@@ -1,19 +1,20 @@
-import aiohttp
+from __future__ import annotations
 
-from osu.abc import User
+from aiohttp import ClientResponse, ClientSession
+
 from .errors import *
 from .types.user import PartialUser
-from typing import List, Union
+from typing import List, Union, Dict,  Any
 
 class HTTPClient:
     def __init__(self, *, client_id: int, client_secret: str):
         self.id = client_id
         self.secret = client_secret
-        self._session: aiohttp.ClientSession = aiohttp.ClientSession()
+        self._session: ClientSession = ClientSession()
         self.API_URL = "https://osu.ppy.sh/api/v2"
         self.TOKEN_URL = "https://osu.ppy.sh/oauth/token"
 
-    async def _request(self, method: str, url: str, **kwargs):
+    async def _request(self, method: str, url: str, **kwargs) -> ClientResponse:
         resp = await self._session.request(method, url,**kwargs)
         return resp
 
@@ -43,9 +44,11 @@ class HTTPClient:
 
         return headers
 
-    async def get_user(self, user: Union[str, int]) -> PartialUser:
+    async def get_user(self, user: Union[str, int]) -> Dict[str, Any]:
         headers = await self._make_headers()
-        return await (await self._request("GET", self.API_URL + f"/users/{user}", headers=headers)).json()
+        resp = await self._request("GET", self.API_URL + f"/users/{user}", headers=headers)
+
+        return await resp.json()
 
     async def get_beatmap(self, beatmap: Union[str, int]):
         headers = await self._make_headers()

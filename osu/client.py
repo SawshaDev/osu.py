@@ -1,18 +1,15 @@
 from __future__ import annotations
 import aiohttp
-from typing import Union, List
-from .errors import *
-from .abc import *
-from .http import HTTPClient
+from typing import Union, Any, Optional
 import logging
 
+
+from .errors import NoBeatMapFound, NoUserFound
+from .http import HTTPClient
+from .models import User, Beatmap, Score, BeatmapCompact, BeatmapSet
+
 logger = logging.getLogger(__name__)
-dt_fmt = '%Y-%m-%d %H:%M:%S'
-formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+
 
 class Client:
     def __init__(self, *, client_id: int, client_secret: str):
@@ -33,15 +30,17 @@ class Client:
     async def close(self):
         await self.http.close()
 
-    async def fetch_user(self, user: Union[str, int]) -> User:
+    async def fetch_user(self, user_id: Union[str, int]) -> User:
         """Fetches a user using either an ID or Username"""
 
-        user = await self.http.get_user(user)
+        user = await self.http.get_user(user_id)
+        
         if 'error' in user.keys() and user['error'] is None:
             raise NoUserFound("No user was found by that name or id!")
+        
         return User(user)
 
-    async def fetch_user_score(self, user: int, /, type: str, limit: int = 1, include_fails: bool = False) -> list[Score]:
+    async def fetch_user_score(self, user: int, *, type: str, limit: int = 1, include_fails: bool = False) -> list[Score]:
         """Fetches scores for a user based on a type and limit"""
     
         if type not in self.score_types:
@@ -61,7 +60,7 @@ class Client:
                 
         return beatmaps
 
-    async def fetch_user_beatmaps(self, /, user: int, type: str, limit: int) -> list[Beatmapset] | list[dict, Union[Beatmapset, BeatmapCompact]]:
+    async def fetch_user_beatmaps(self, /, user: int, type: str, limit: int) -> list[BeatmapSet] | list[dict[str, Union[BeatmapSet, BeatmapCompact]]]:
         """Fetches beatmaps for a user based on a type and limit""" 
         params = {
             "limit": limit
@@ -77,13 +76,13 @@ class Client:
         
         for beatmap in json:
             if type in self.special_types:
-                beatmaps.append({"beatmapset":Beatmapset(beatmap['beatmapset']), "beatmap": BeatmapCompact(beatmap['beatmap'])})
+                beatmaps.append({"beatmapset":BeatmapSet(beatmap['beatmapset']), "beatmap": BeatmapCompact(beatmap['beatmap'])})
             else:
-                beatmaps.append(Beatmapset(beatmap))
+                beatmaps.append(BeatmapSet(beatmap))
                 
         return beatmaps
     
-    async def _tests(self, method: str, /, endpoint: str, params: dict = None):
+    async def _tests(self, method: str, /, endpoint: str, params: Optional[dict[str, Any]] = None):
         headers = await self.http._make_headers()
         async with self.http._session.request(method, self.http.API_URL + endpoint, params=params, headers=headers) as resp:
             json = await resp.json()
